@@ -13,17 +13,17 @@ set_r_time <- function(r) {
   return(r)
 }
 
-zonal_info <- function(files, func) {
+zonal_info <- function(files, func, shp) {
   files %>% 
     purrr::map(function(x) {
       print(x)
       terra::rast(x) %>% 
-        terra::crop(county) %>% 
+        terra::crop(shp) %>% 
         set_r_time() %>% 
         terra::tapp("yearmonths", fun = func) 
     }) %>% 
     terra::rast() %>% 
-    normals::spat_summary(county, "name", "date", "mean") %>% 
+    normals::spat_summary(shp, "name", "date", "mean") %>% 
     dplyr::select(-geometry) %>% 
     dplyr::rename(name=zone) %>% 
     dplyr::mutate(
@@ -37,20 +37,28 @@ county <- urbnmapr::get_urbn_map(map = "counties", sf = TRUE) %>%
   dplyr::filter(state_name == "Montana") %>% 
   dplyr::select(name=county_name, id=county_fips)
 
-test <- list.files(
-  "~/data/gridmet/raw", full.names = T, recursive = T, pattern = ".nc"
-) %>%
-  tibble::tibble(r = .) %>%
-  dplyr::mutate(
-    name = basename(r) %>%
-      tools::file_path_sans_ext()
+huc <- sf::read_sf("~/git/report-builder/app/app/data/mt_hucs.geojson")
+
+make_historical_data <- function(shp, type) {
+  list.files(
+    "~/data/gridmet/raw", full.names = T, recursive = T, pattern = ".nc"
   ) %>%
-  tidyr::separate(name, c("variable", "year")) %>%
-  dplyr::mutate(func = ifelse(variable %in% c("pr", "etr", "pet"), "sum", "mean")) %>% 
-  dplyr::group_by(variable) %>% 
-  dplyr::summarise(
-    out = list(zonal_info(r, unique(func)))
-  ) %>% 
-  tidyr::unnest(out) %>%
-  dplyr::select(name, id, variable, date, value) %>% 
-  readr::write_csv("./db/data/county_historical.csv")
+    tibble::tibble(r = .) %>%
+    dplyr::mutate(
+      name = basename(r) %>%
+        tools::file_path_sans_ext()
+    ) %>%
+    tidyr::separate(name, c("variable", "year")) %>%
+    dplyr::mutate(func = ifelse(variable %in% c("pr", "etr", "pet"), "sum", "mean")) %>% 
+    dplyr::group_by(variable) %>% 
+    dplyr::summarise(
+      out = list(zonal_info(r, unique(func), shp))
+    ) %>% 
+    tidyr::unnest(out) %>%
+    dplyr::select(name, id, variable, date, value) %>% 
+    readr::write_csv(glue::glue("./db/data/{type}_historical.csv"))
+}
+
+
+make_historical_data(county, "county")
+make_historical_data(huc, "huc")
