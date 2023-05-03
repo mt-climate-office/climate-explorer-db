@@ -24,7 +24,6 @@ zonal_info <- function(files, func, shp) {
     }) %>% 
     terra::rast() %>% 
     normals::spat_summary(shp, "name", "date", "mean") %>% 
-    dplyr::select(-geometry) %>% 
     dplyr::rename(name=zone) %>% 
     dplyr::mutate(
       date = paste0(date, "01") %>% 
@@ -38,6 +37,16 @@ county <- urbnmapr::get_urbn_map(map = "counties", sf = TRUE) %>%
   dplyr::select(name=county_name, id=county_fips)
 
 huc <- sf::read_sf("~/git/report-builder/app/app/data/mt_hucs.geojson")
+
+tribes <- mcor::mt_tribal_land %>% 
+  dplyr::transmute(
+    name = Name, 
+    id = stringr::str_replace_all(Name, " ", "-") %>%
+      stringr::str_replace_all("'", "") %>% 
+      tolower()
+  ) %>% 
+  sf::st_transform(4326)
+
 
 make_historical_data <- function(shp, type) {
   list.files(
@@ -62,3 +71,4 @@ make_historical_data <- function(shp, type) {
 
 make_historical_data(county, "county")
 make_historical_data(huc, "huc")
+make_historical_data(tribes, "tribes")

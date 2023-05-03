@@ -24,7 +24,6 @@ build_table <- function(path, shp, region_type, out_dir = "./db/data/") {
     dplyr::mutate(r = list(normals::spat_summary(r, shp, attr_id = "id", name_to = "date", fun = "mean"))) %>%
     tidyr::unnest(cols=r) %>%
     sf::st_drop_geometry() %>% 
-    dplyr::select(-geometry) %>% 
     tidyr::separate(date, c("year", "month"), sep = "\\.") %>% 
     dplyr::mutate(
       month = paste0("0.", month) %>% 
@@ -54,5 +53,15 @@ county <- urbnmapr::get_urbn_map(map = "counties", sf = TRUE) %>%
   dplyr::filter(state_name == "Montana") %>% 
   dplyr::select(name=county_name, id=county_fips)
 
+tribes <- mcor::mt_tribal_land %>% 
+  dplyr::transmute(
+    name = Name, 
+    id = stringr::str_replace_all(Name, " ", "-") %>%
+      stringr::str_replace_all("'", "") %>% 
+      tolower()
+  ) %>% 
+  sf::st_transform(4326)
+
 # build_table(path, huc, "name", "huc", "~/git/report-builder/db/data/")
-build_table(path, county, "county", "~/git/report-builder/db/data/")
+# build_table(path, county, "county", "~/git/report-builder/db/data/")
+build_table(path, tribes, "tribes", "./db/data/")
