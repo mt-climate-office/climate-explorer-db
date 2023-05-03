@@ -72,7 +72,7 @@ alter table future.tribes
 	add column "date" date,
 	add column value numeric;
 
-CREATE UNIQUE INDEX county_future_unique_index ON future.tribes USING btree (id, variable, date DESC, scenario, model);
+CREATE UNIQUE INDEX tribes_future_unique_index ON future.tribes USING btree (id, variable, date DESC, scenario, model);
 
 set datestyle to ISO, YMD;
 copy future.tribes (model, scenario, variable, "name", "date", value, id) from '/data/tribes.csv' delimiter ',' csv header;
@@ -85,7 +85,7 @@ alter table historical.tribes
 	add column "date" date,
 	add column value numeric;
 
-CREATE UNIQUE INDEX huc_historical_unique_index ON historical.tribes USING btree (id, variable, date DESC);
+CREATE UNIQUE INDEX tribes_historical_unique_index ON historical.tribes USING btree (id, variable, date DESC);
 
 set datestyle to ISO, YMD;
 copy historical.tribes ("name", id, variable, "date", value) from '/data/tribes_historical.csv' delimiter ',' csv header;
