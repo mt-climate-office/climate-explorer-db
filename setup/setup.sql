@@ -90,3 +90,25 @@ CREATE UNIQUE INDEX tribes_historical_unique_index ON historical.tribes USING bt
 set datestyle to ISO, YMD;
 copy historical.tribes ("name", id, variable, "date", value) from '/data/tribes_historical.csv' delimiter ',' csv header;
 
+create table future.blm();
+alter table future.blm
+	add column "name" varchar(64),
+	add column id varchar(64),
+	add column model varchar(64),
+	add column scenario varchar(64),
+	add column variable varchar(64),
+	add column "date" date,
+	add column value numeric;
+
+CREATE UNIQUE INDEX blm_future_unique_index ON future.blm USING btree (id, variable, date DESC, scenario, model);
+
+
+create table historical.blm();
+alter table historical.blm
+	add column "name" varchar(64),
+	add column id varchar(64),
+	add column variable varchar(64),
+	add column "date" date,
+	add column value numeric;
+
+CREATE UNIQUE INDEX blm_historical_unique_index ON historical.blm USING btree (id, variable, date DESC);
