@@ -46,7 +46,7 @@ zonal_info <- function(files, func, shp) {
 #   ) %>% 
 #   sf::st_transform(4326)
 
-blm <- sf::read_sf("~/git/report-builder/app/app/data/blm.geojson")
+blm <- sf::read_sf("~/git/report-builder/app/app/data/blm.geojson") 
 
 
 make_historical_data <- function(shp, type) {
