@@ -1,5 +1,6 @@
 library(rgee)
-reticulate::use_python("/home/cbrust/git/py-def-env/.venv/bin/python")
+
+reticulate::use_python("/Users/Colin.Brust/.virtualenvs/rgee/bin/python")
 reticulate::import("ee")
 ee$Initialize()
 
@@ -15,7 +16,7 @@ clean_mod16 <- function(img) {
   good_quality = get_qa_bits(qa, 0, 0)$eq(0)
   no_clouds = get_qa_bits(qa, 3, 4)$eq(0)
   mask = good_quality$And(no_clouds)
-  
+
   img$updateMask(mask)$
     select(c("ET", "PET"))$
     copyProperties(img, list("system:time_start"))
@@ -26,7 +27,7 @@ clean_mod17 <- function(img) {
   good_quality = get_qa_bits(qa, 0, 0)$eq(0)
   no_clouds = get_qa_bits(qa, 3, 4)$eq(0)
   mask = good_quality$And(no_clouds)
-  
+
   img$updateMask(mask)$
     select("Gpp")$
     copyProperties(img, list("system:time_start"))
@@ -42,7 +43,7 @@ clean_mod13 <- function(img) {
 }
 
 reduce_to_region <- function(shp, r, out_name, resolution=500) {
-  
+  print(glue::glue("Working on {out_name}..."))
   reduced <- r$map(function(image) {
     image$reduceRegions(
       collection = shp,
@@ -55,14 +56,18 @@ reduce_to_region <- function(shp, r, out_name, resolution=500) {
         )
       )
     })
-  })$flatten()
-  
-  dat <- rgee::ee_as_sf(reduced, maxFeatures=20000)
-  
-  dat %>% 
-    sf::st_drop_geometry() %>% 
-    tibble::as_tibble() %>%
-    tidyr::pivot_longer(-c(date, id, name), names_to = "variable")
+  })$flatten()$map(
+    function(x) {
+      ee$Feature(NULL, x$toDictionary())
+    }
+  )
+
+  dat <- rgee::ee_as_sf(reduced, maxFeatures=75000, via="drive")
+
+  dat %>%
+    sf::st_drop_geometry() %>%
+    tidyr::pivot_longer(-c(date, id, name), names_to = "variable") %>%
+    readr::write_csv(out_name)
 }
 
 county <- urbnmapr::get_urbn_map(map = "counties", sf = TRUE) %>%
@@ -72,51 +77,45 @@ county <- urbnmapr::get_urbn_map(map = "counties", sf = TRUE) %>%
 
 huc <- sf::read_sf("~/git/report-builder/app/app/data/mt_hucs.geojson")
 
-tribes <- mcor::mt_tribal_land %>%
-  dplyr::transmute(
-    name = Name,
-    id = stringr::str_replace_all(Name, " ", "-") %>%
-      stringr::str_replace_all("'", "") %>%
-      tolower()
-  ) %>%
-  sf::st_transform(4326)
+tribes <- sf::read_sf("~/git/report-builder/app/app/data/tribes.geojson") %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(id = stringr::str_split(id, "_") %>%
+                  unlist() %>%
+                  magrittr::extract(2))
 
-blm <- sf::read_sf("~/git/report-builder/app/app/data/blm.geojson") 
+blm <- sf::read_sf("~/git/report-builder/app/app/data/blm.geojson")
 
 tidyr::crossing(
-  product = c("mod16", "mod17", "mod13", "cover", "npp"),
+  product = c("mod16", "mod17", "npp", "mod13", "cover"),
   loc_type = c("county", "huc", "tribe", "blm")
-) %>% 
+) %>%
   dplyr::mutate(
     resolution = dplyr::case_when(
-      product %in% c("mod13", "mod16", "mod17") ~ 500, 
+      product %in% c("mod13", "mod16", "mod17") ~ 500,
       TRUE ~ 30
     ),
     shp =
       dplyr::case_when(
-        loc_type == "county" ~ list(county), 
-        loc_type == "huc" ~ list(huc),
-        loc_type == "tribe" ~ list(tribes),
-        loc_type == "blm" ~ list(blm)
-      
+        loc_type == "county" ~ list(county %>%
+                                      rgee::sf_as_ee()),
+        loc_type == "huc" ~ list(huc %>%
+                                   rgee::sf_as_ee()),
+        loc_type == "tribe" ~ list(tribes %>%
+                                     rgee::sf_as_ee()),
+        loc_type == "blm" ~ list(blm %>%
+                                   rgee::sf_as_ee())
+
     ),
-    product = 
+    coll =
       dplyr::case_when(
         product == "mod16" ~ list(ee$ImageCollection("MODIS/061/MOD16A2")$map(clean_mod16)),
         product == "mod17" ~ list(ee$ImageCollection("MODIS/006/MOD17A2H")$map(clean_mod17)),
-        product == "mod13" ~ list(ee$ImageCollection("MODIS/061/MOD13A1")$map(clean_mod17)),
+        product == "mod13" ~ list(ee$ImageCollection("MODIS/061/MOD13A1")$map(clean_mod13)),
         product == "cover" ~ list(ee$ImageCollection("projects/rangeland-analysis-platform/vegetation-cover-v3")),
-        product == "npp" ~ list(ee.ImageCollection("projects/rangeland-analysis-platform/npp-partitioned-v3"))
-      )
-  )
-mod16 <- ee$ImageCollection("MODIS/061/MOD16A2")$map(clean_mod16)
-mod17 <- ee$ImageCollection("MODIS/006/MOD17A2H")$map(clean_mod17)
-mod13 <- ee$ImageCollection("MODIS/061/MOD13A1")$map(clean_mod17)
-cover <- ee$ImageCollection("projects/rangeland-analysis-platform/vegetation-cover-v3")
-npp <- ee.ImageCollection("projects/rangeland-analysis-platform/npp-partitioned-v3")
+        product == "npp" ~ list(ee$ImageCollection("projects/rangeland-analysis-platform/npp-partitioned-v3"))
+      ),
+    out_name = glue::glue("~/git/climate-explorer-db/db/{loc_type}_{product}.csv")
+  ) %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(extracted = list(reduce_to_region(shp, coll, out_name, resolution)))
 
-county <- urbnmapr::get_urbn_map(map = "counties", sf = TRUE) %>% 
-  sf::st_transform(crs = sf::st_crs(4326)) %>% 
-  dplyr::filter(state_name == "Montana") %>% 
-  dplyr::select(name=county_name, id=county_fips) %>% 
-  sf_as_ee()
