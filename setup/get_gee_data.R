@@ -86,7 +86,8 @@ tribes <- sf::read_sf("~/git/report-builder/app/app/data/tribes.geojson") %>%
 blm <- sf::read_sf("~/git/report-builder/app/app/data/blm.geojson")
 
 tidyr::crossing(
-  product = c("mod16", "mod17", "npp", "mod13", "cover"),
+  # product = c("mod16", "mod17", "npp", "mod13", "cover"),
+  product = c("mod16"),
   loc_type = c("county", "huc", "tribe", "blm")
 ) %>%
   dplyr::mutate(
@@ -108,11 +109,11 @@ tidyr::crossing(
     ),
     coll =
       dplyr::case_when(
-        product == "mod16" ~ list(ee$ImageCollection("MODIS/061/MOD16A2")$map(clean_mod16)),
-        product == "mod17" ~ list(ee$ImageCollection("MODIS/006/MOD17A2H")$map(clean_mod17)),
-        product == "mod13" ~ list(ee$ImageCollection("MODIS/061/MOD13A1")$map(clean_mod13)),
-        product == "cover" ~ list(ee$ImageCollection("projects/rangeland-analysis-platform/vegetation-cover-v3")),
-        product == "npp" ~ list(ee$ImageCollection("projects/rangeland-analysis-platform/npp-partitioned-v3"))
+        product == "mod16" ~ list(ee$ImageCollection("MODIS/006/MOD16A2")$map(clean_mod16)),
+        # product == "mod17" ~ list(ee$ImageCollection("MODIS/006/MOD17A2H")$map(clean_mod17)),
+        # product == "mod13" ~ list(ee$ImageCollection("MODIS/061/MOD13A1")$map(clean_mod13)),
+        # product == "cover" ~ list(ee$ImageCollection("projects/rangeland-analysis-platform/vegetation-cover-v3")),
+        # product == "npp" ~ list(ee$ImageCollection("projects/rangeland-analysis-platform/npp-partitioned-v3"))
       ),
     out_name = glue::glue("~/git/climate-explorer-db/db/{loc_type}_{product}.csv")
   ) %>%

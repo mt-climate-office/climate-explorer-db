@@ -7,7 +7,7 @@ con <-
                  port = 5433
   )
 
-list.files("./db", full.names = T, pattern = ".csv") %>%
+list.files("./db", full.names = T, pattern = "mod16.csv") %>%
   purrr::map(function(x) {
     print(x)
     dat <- readr::read_csv(x, col_types = readr::cols(id="c")) %>%
@@ -27,10 +27,12 @@ list.files("./db", full.names = T, pattern = ".csv") %>%
           TRUE ~ value
         )
       ) %>%
-      dplyr::filter(variable != "ltr")
+      dplyr::filter(
+        variable != "ltr",
+        date < as.Date("2021-01-01"))
 
 
-      tab <- tools::file_path_sans_ext(x) %>%
+  tab <- tools::file_path_sans_ext(x) %>%
                       basename() %>%
                       stringr::str_split_1("_") %>%
                       magrittr::extract(1)
