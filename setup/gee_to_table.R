@@ -7,7 +7,8 @@ con <-
                  port = 5433
   )
 
-list.files("./db", full.names = T, pattern = "mod16.csv") %>%
+list.files("./db", full.names = T, pattern = ".csv") %>%
+  grep("preprocess.csv", ., value = T, invert = T) %>%
   purrr::map(function(x) {
     print(x)
     dat <- readr::read_csv(x, col_types = readr::cols(id="c")) %>%
@@ -24,7 +25,7 @@ list.files("./db", full.names = T, pattern = "mod16.csv") %>%
           variable %in% c("ndvi", "evi") ~ value * 0.0001,
           variable %in% c("et_m16", "pet_m16") ~ value * 0.1,
           variable == "gpp" ~ value * 0.0001,
-          TRUE ~ value
+          TRUE ~ value * 0.0001
         )
       ) %>%
       dplyr::filter(
@@ -46,7 +47,22 @@ list.files("./db", full.names = T, pattern = "mod16.csv") %>%
         overwrite = FALSE,
         row.names = FALSE
       )
-
   })
 
 DBI::dbDisconnect(con)
+
+
+
+
+# del <- tidyr::crossing(
+#   ids = c("afg", "bgr", "evi", "ltr", "pet_m16", 
+#           "pfgnpp", "shrnpp", "trenpp", "afgnpp", "et_m16",
+#           "gpp", "ndvi", "pfg", "shr", "tre"),
+#   dbs = c("historical.blm", "historical.county", "historical.huc")
+# ) %>%
+#   dplyr::mutate(
+#     delete_queries = glue::glue("DELETE from {dbs} WHERE (variable = '{ids}');")
+#   )
+# 
+# purrr::map(.x = del$delete_queries, .f = DBI::dbExecute, conn = con)
+
