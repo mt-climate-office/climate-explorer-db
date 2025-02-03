@@ -14,7 +14,7 @@ services:
             # - ./db/data:/data
 
         # command: postgres -c config_file=/etc/postgresql/postgresql.conf
-        restart: on-failure
+        restart: always
         healthcheck:
             test: "exit 0"
 
